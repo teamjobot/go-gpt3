@@ -174,7 +174,9 @@ func (c *client) CompletionStream(ctx context.Context, request CompletionRequest
 }
 
 func formatInterviewInput(input string) string {
-	return newLineRe.ReplaceAllString(input, " ")
+	output := newLineRe.ReplaceAllString(input, " ")
+	output = strings.ReplaceAll(output, "•", "")
+	return output
 }
 
 func trimStr(input *string) string {
@@ -248,14 +250,21 @@ func parseInterviewChoice(ch CompletionResponseChoice) []InterviewQuestion {
 		return nil
 	}
 
-	parts := strings.Split(ch.Text, "\n\n")
+	parts := strings.Split(ch.Text, "\n")
 
 	for _, part := range parts {
-		// Last question can be truncated
+		// Last question can be truncated. Might also need to check ch.FinishReason for length later
 		if len(part) > 0 && strings.HasSuffix(part, "?") {
+			ques := part
+
+			// TODO: occasionally the responses are numbered in the text
+			if strings.HasPrefix(ques, "-") {
+				ques = ques[1:]
+			}
+
 			data = append(data, InterviewQuestion{
 				Index:    len(data) + 1,
-				Question: part,
+				Question: ques,
 			})
 		}
 	}
