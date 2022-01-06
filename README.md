@@ -45,7 +45,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/PullRequestInc/go-gpt3"
+	"github.com/teamjobot/go-gpt3"
 	"github.com/joho/godotenv"
 )
 

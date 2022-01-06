@@ -5,20 +5,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 )
 
 // Engine Types
 const (
-	AdaEngine     = "ada"
-	BabbageEngine = "babbage"
-	CurieEngine   = "curie"
-	DavinciEngine = "davinci"
-	DefaultEngine = DavinciEngine
+	AdaEngine             = "ada"
+	BabbageEngine         = "babbage"
+	CurieEngine           = "curie"
+	DavinciEngine         = "davinci"
+	DavinciInstructEngine = "davinci-instruct-beta"
+	DefaultEngine         = DavinciEngine
 )
 
 const (
@@ -27,8 +31,22 @@ const (
 	defaultTimeoutSeconds = 30
 )
 
+var (
+	newLineRe = regexp.MustCompile(`\r?\n`)
+)
+
 func getEngineURL(engine string) string {
 	return fmt.Sprintf("%s/engines/%s/completions", defaultBaseURL, engine)
+}
+
+type InterviewArgs struct {
+	JobTitle       *string
+	JobDescription *string
+}
+
+type InterviewQuestion struct {
+	Index    int
+	Question string
 }
 
 // A Client is an API client to communicate with the OpenAI gpt-3 APIs
@@ -54,6 +72,10 @@ type Client interface {
 
 	// CompletionStreamWithEngine is the same as CompletionStream except allows overriding the default engine on the client
 	CompletionStreamWithEngine(ctx context.Context, engine string, request CompletionRequest, onData func(*CompletionResponse)) error
+
+	// InterviewQuestions is a specialized form of completion with a different engine and question generation in mind
+	// given a job title and/or description.
+	InterviewQuestions(ctx context.Context, args InterviewArgs) ([]InterviewQuestion, error)
 
 	// Search performs a semantic search over a list of documents with the default engine.
 	Search(ctx context.Context, request SearchRequest) (*SearchResponse, error)
@@ -149,6 +171,100 @@ func (c *client) CompletionWithEngine(ctx context.Context, engine string, reques
 
 func (c *client) CompletionStream(ctx context.Context, request CompletionRequest, onData func(*CompletionResponse)) error {
 	return c.CompletionStreamWithEngine(ctx, c.defaultEngine, request, onData)
+}
+
+func formatInterviewInput(input string) string {
+	return newLineRe.ReplaceAllString(input, " ")
+}
+
+func trimStr(input *string) string {
+	if input == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*input)
+}
+
+func getInterviewPrompt(jobTitle, jobDesc string) string {
+	var prompt string
+
+	if len(jobTitle) > 0 && len(jobDesc) > 0 {
+		prompt = fmt.Sprintf(
+			"Create a list of questions for my interview with a %s, %s",
+			formatInterviewInput(jobTitle),
+			formatInterviewInput(jobDesc))
+	} else if len(jobTitle) > 0 {
+		prompt = fmt.Sprintf("Create a list of questions for my interview with a %s", formatInterviewInput(jobTitle))
+	} else if len(jobDesc) > 0 {
+		prompt = fmt.Sprintf(
+			"Create a list of questions for my interview with a job description of %s",
+			formatInterviewInput(jobDesc))
+	}
+
+	return prompt
+}
+
+func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) ([]InterviewQuestion, error) {
+	jobTitle := trimStr(args.JobTitle)
+	jobDesc := trimStr(args.JobDescription)
+
+	if len(jobTitle) == 0 && len(jobDesc) == 0 {
+		return nil, errors.New("must specify a job title or description")
+	}
+
+	prompt := getInterviewPrompt(jobTitle, jobDesc)
+
+	resp, err := c.CompletionWithEngine(
+		ctx,
+		DavinciInstructEngine,
+		CompletionRequest{
+			MaxTokens:   IntPtr(64),
+			Prompt:      []string{prompt},
+			Temperature: Float32Ptr(0.8),
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var data []InterviewQuestion
+
+	// Will only be one result max really
+	for _, ch := range resp.Choices {
+		items := parseInterviewChoice(ch)
+
+		if items != nil {
+			data = append(data, items...)
+		}
+	}
+
+	return data, err
+}
+
+func parseInterviewChoice(ch CompletionResponseChoice) []InterviewQuestion {
+	var data []InterviewQuestion
+
+	if len(ch.Text) == 0 {
+		return nil
+	}
+
+	parts := strings.Split(ch.Text, "\n\n")
+
+	for _, part := range parts {
+		// Last question can be truncated
+		if len(part) > 0 && strings.HasSuffix(part, "?") {
+			data = append(data, InterviewQuestion{
+				Index:    len(data) + 1,
+				Question: part,
+			})
+		}
+	}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	return data
 }
 
 var dataPrefix = []byte("data: ")
@@ -284,7 +400,7 @@ func (c *client) newRequest(ctx context.Context, method, path string, payload in
 	if err != nil {
 		return nil, err
 	}
-	if (len(c.idOrg) > 0) {
+	if len(c.idOrg) > 0 {
 		req.Header.Set("OpenAI-Organization", c.idOrg)
 	}
 	req.Header.Set("Content-type", "application/json")
