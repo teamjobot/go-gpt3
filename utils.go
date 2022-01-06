@@ -1,5 +1,7 @@
 package gpt3
 
+import "strings"
+
 // Float32Ptr converts a float to an *float32 as a convenience
 func Float32Ptr(f float32) *float32 {
 	return &f
@@ -28,4 +30,12 @@ func intPtrDefault(i *int, defaultValue int) *int {
 	}
 
 	return i
+}
+
+func trimStr(input *string) string {
+	if input == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*input)
 }
