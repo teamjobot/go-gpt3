@@ -5,7 +5,45 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
+
+type InterviewArgs struct {
+	JobTitle       *string
+	JobDescription *string
+}
+
+type InterviewInput struct {
+	Engine    string
+	MaxTokens *int
+	Prompt    string
+	Temp      *float32
+}
+
+type InterviewResponse struct {
+	Input InterviewInput
+	Duration time.Duration
+	Questions []InterviewQuestion
+}
+
+type InterviewQuestion struct {
+	Index    int
+	Question string
+}
+
+func (r *InterviewResponse) QuestionText() string {
+	var sb strings.Builder
+
+	for index, r := range r.Questions {
+		sb.WriteString(r.Question)
+
+		if index+1 < len(r.Question) {
+			sb.WriteString("\n\n")
+		}
+	}
+
+	return sb.String()
+}
 
 func formatInterviewInput(input string) string {
 	output := newLineRe.ReplaceAllString(input, " ")
@@ -32,7 +70,8 @@ func getInterviewPrompt(jobTitle, jobDesc string) string {
 	return prompt
 }
 
-func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) ([]InterviewQuestion, error) {
+func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*InterviewResponse, error) {
+	start := time.Now()
 	jobTitle := trimStr(args.JobTitle)
 	jobDesc := trimStr(args.JobDescription)
 
@@ -40,33 +79,42 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) ([]
 		return nil, errors.New("must specify a job title or description")
 	}
 
+	engine := DavinciInstructEngine
 	prompt := getInterviewPrompt(jobTitle, jobDesc)
 
-	resp, err := c.CompletionWithEngine(
-		ctx,
-		DavinciInstructEngine,
-		CompletionRequest{
-			MaxTokens:   IntPtr(64),
-			Prompt:      []string{prompt},
-			Temperature: Float32Ptr(0.8),
-		})
+	request := CompletionRequest{
+		MaxTokens:   IntPtr(64),
+		Prompt:      []string{prompt},
+		Temperature: Float32Ptr(0.8),
+	}
+
+	resp, err := c.CompletionWithEngine(ctx, engine, request)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var data []InterviewQuestion
+	result := &InterviewResponse{
+		Input: InterviewInput{
+			Engine:    engine,
+			MaxTokens: request.MaxTokens,
+			Prompt:    prompt,
+			Temp:      request.Temperature,
+		},
+	}
 
 	// Will only be one result max really
 	for _, ch := range resp.Choices {
 		items := parseInterviewChoice(ch)
 
 		if items != nil {
-			data = append(data, items...)
+			result.Questions = append(result.Questions, items...)
 		}
 	}
 
-	return data, err
+	result.Duration = time.Since(start)
+
+	return result, err
 }
 
 func parseInterviewChoice(ch CompletionResponseChoice) []InterviewQuestion {
@@ -87,6 +135,8 @@ func parseInterviewChoice(ch CompletionResponseChoice) []InterviewQuestion {
 			if strings.HasPrefix(ques, "-") {
 				ques = ques[1:]
 			}
+
+			ques = strings.TrimSpace(ques)
 
 			data = append(data, InterviewQuestion{
 				Index:    len(data) + 1,

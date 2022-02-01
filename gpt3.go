@@ -37,16 +37,6 @@ func getEngineURL(engine string) string {
 	return fmt.Sprintf("%s/engines/%s/completions", defaultBaseURL, engine)
 }
 
-type InterviewArgs struct {
-	JobTitle       *string
-	JobDescription *string
-}
-
-type InterviewQuestion struct {
-	Index    int
-	Question string
-}
-
 // A Client is an API client to communicate with the OpenAI gpt-3 APIs
 type Client interface {
 	// Engines lists the currently available engines, and provides basic information about each
@@ -73,7 +63,7 @@ type Client interface {
 
 	// InterviewQuestions is a specialized form of completion with a different engine and question generation in mind
 	// given a job title and/or description.
-	InterviewQuestions(ctx context.Context, args InterviewArgs) ([]InterviewQuestion, error)
+	InterviewQuestions(ctx context.Context, args InterviewArgs) (*InterviewResponse, error)
 
 	// Search performs a semantic search over a list of documents with the default engine.
 	Search(ctx context.Context, request SearchRequest) (*SearchResponse, error)
