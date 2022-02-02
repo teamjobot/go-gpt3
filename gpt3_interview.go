@@ -10,6 +10,7 @@ import (
 )
 
 type InterviewArgs struct {
+	Cap            *int
 	JobTitle       *string
 	JobDescription *string
 }
@@ -17,13 +18,15 @@ type InterviewArgs struct {
 type InterviewInput struct {
 	Engine    string
 	MaxTokens *int
+	N         *float32
 	Prompt    string
 	Temp      *float32
+	TopP      *float32
 }
 
 type InterviewResponse struct {
-	Input InterviewInput
-	Duration time.Duration
+	Input     InterviewInput
+	Duration  time.Duration
 	Questions []InterviewQuestion
 }
 
@@ -83,10 +86,32 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 	engine := DavinciInstructEngine
 	prompt := getInterviewPrompt(jobTitle, jobDesc)
 
+	/*
+		TopP and Temp use one or the other, set other to 1...
+		"Top P provides better control for applications in which GPT-3 is expected to generate text with accuracy and
+		correctness, while Temperature works best for those applications in which original, creative or even amusing
+		responses are sought."
+
+		MaxTokens (might make client arg later):
+		- 512 can generate about 51 questions but takes over 20 seconds.
+		- 128 about 12 ques in 5+sec.
+		- 75 seems good for about 5ish questions ~3 sec
+	*/
 	request := CompletionRequest{
-		MaxTokens:   IntPtr(64),
-		Prompt:      []string{prompt},
-		Temperature: Float32Ptr(0.8),
+		MaxTokens: IntPtr(75),
+
+		// Just 1, there are multiple answers in one block stream
+		N: Float32Ptr(1),
+
+		Prompt: []string{prompt},
+
+		Temperature: Float32Ptr(1),
+		TopP:        Float32Ptr(0.9),
+	}
+
+	cap := 5
+	if args.Cap != nil {
+		cap = *args.Cap
 	}
 
 	resp, err := c.CompletionWithEngine(ctx, engine, request)
@@ -99,8 +124,10 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 		Input: InterviewInput{
 			Engine:    engine,
 			MaxTokens: request.MaxTokens,
+			N:         request.N,
 			Prompt:    prompt,
 			Temp:      request.Temperature,
+			TopP:      request.TopP,
 		},
 	}
 
@@ -109,7 +136,13 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 		items := parseInterviewChoice(ch)
 
 		if items != nil {
-			result.Questions = append(result.Questions, items...)
+			// result.Questions = append(result.Questions, items...)
+			for _, qu := range items {
+				if len(result.Questions) == cap {
+					break
+				}
+				result.Questions = append(result.Questions, qu)
+			}
 		}
 	}
 
