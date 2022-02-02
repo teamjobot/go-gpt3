@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -117,6 +118,30 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 	return result, err
 }
 
+func parseText(question string) string {
+	ques := strings.TrimSpace(question)
+
+	if strings.HasPrefix(ques, "-") {
+		ques = ques[1:]
+	}
+
+	// Sometimes question results are numbered 1), 2), etc. which we want to strip
+	pos := strings.Index(ques, ") ")
+
+	// i.e. "1)" through "99)"
+	if pos > -1 && pos <= 2 {
+		tmp := ques[0:pos]
+		_, err := strconv.Atoi(tmp)
+
+		if err == nil {
+			//ques = ques[pos:len(tmp)-pos]
+			ques = ques[pos+2:]
+		}
+	}
+
+	return strings.TrimSpace(ques)
+}
+
 func parseInterviewChoice(ch CompletionResponseChoice) []InterviewQuestion {
 	var data []InterviewQuestion
 
@@ -129,14 +154,7 @@ func parseInterviewChoice(ch CompletionResponseChoice) []InterviewQuestion {
 	for _, part := range parts {
 		// Last question can be truncated. Might also need to check ch.FinishReason for length later
 		if len(part) > 0 && strings.HasSuffix(part, "?") {
-			ques := part
-
-			// TODO: occasionally the responses are numbered in the text
-			if strings.HasPrefix(ques, "-") {
-				ques = ques[1:]
-			}
-
-			ques = strings.TrimSpace(ques)
+			ques := parseText(part)
 
 			data = append(data, InterviewQuestion{
 				Index:    len(data) + 1,
