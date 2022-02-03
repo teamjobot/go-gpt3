@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+const (
+	InterviewEngine = "text-davinci-001"
+)
+
 type InterviewArgs struct {
 	Cap            *int
 	JobTitle       *string
@@ -16,12 +20,14 @@ type InterviewArgs struct {
 }
 
 type InterviewInput struct {
-	Engine    string
-	MaxTokens *int
-	N         *float32
-	Prompt    string
-	Temp      *float32
-	TopP      *float32
+	Engine           string
+	FrequencyPenalty float32
+	MaxTokens        *int
+	N                *float32
+	PresencePenalty  float32
+	Prompt           string
+	Temp             *float32
+	TopP             *float32
 }
 
 type InterviewResponse struct {
@@ -33,6 +39,10 @@ type InterviewResponse struct {
 type InterviewQuestion struct {
 	Index    int
 	Question string
+}
+
+func (r *InterviewResponse) HasQuestions() bool {
+	return r != nil && r.Questions != nil && len(r.Questions) > 0
 }
 
 func (r *InterviewResponse) QuestionText() string {
@@ -83,11 +93,19 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 		return nil, errors.New("must specify a job title or description")
 	}
 
-	engine := DavinciInstructEngine
+	engine := InterviewEngine
 	prompt := getInterviewPrompt(jobTitle, jobDesc)
 
 	/*
+		Frequence penalty:
+		Lowers the chances of a word being selected again the more times that word has already been used.
+
+		Presence Penalty:
+		Presence penalty does not consider how frequently a word has been used, but just if the word exists in the text.
+		This helps to make it less repetitive and seem more natural.
+
 		TopP and Temp use one or the other, set other to 1...
+		Controls diversity via nucleus sampling; 0.5 means half of al likelihood-weighted options are considered.
 		"Top P provides better control for applications in which GPT-3 is expected to generate text with accuracy and
 		correctness, while Temperature works best for those applications in which original, creative or even amusing
 		responses are sought."
@@ -98,15 +116,19 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 		- 75 seems good for about 5ish questions ~3 sec
 	*/
 	request := CompletionRequest{
-		MaxTokens: IntPtr(75),
+		FrequencyPenalty: .75,
+
+		MaxTokens: IntPtr(175),
 
 		// Just 1, there are multiple answers in one block stream
 		N: Float32Ptr(1),
 
+		PresencePenalty: .7,
+
 		Prompt: []string{prompt},
 
 		Temperature: Float32Ptr(1),
-		TopP:        Float32Ptr(0.9),
+		TopP:        Float32Ptr(0.85),
 	}
 
 	cap := 5
@@ -120,14 +142,17 @@ func (c *client) InterviewQuestions(ctx context.Context, args InterviewArgs) (*I
 		return nil, err
 	}
 
+	// Trying not to expose GPT-3 types to insulate caller but we are repeating some things w/that
 	result := &InterviewResponse{
 		Input: InterviewInput{
-			Engine:    engine,
-			MaxTokens: request.MaxTokens,
-			N:         request.N,
-			Prompt:    prompt,
-			Temp:      request.Temperature,
-			TopP:      request.TopP,
+			Engine:           engine,
+			FrequencyPenalty: request.FrequencyPenalty,
+			MaxTokens:        request.MaxTokens,
+			N:                request.N,
+			PresencePenalty:  request.PresencePenalty,
+			Prompt:           prompt,
+			Temp:             request.Temperature,
+			TopP:             request.TopP,
 		},
 	}
 
