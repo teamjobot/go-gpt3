@@ -63,7 +63,11 @@ type Client interface {
 
 	// InterviewQuestions is a specialized form of completion with a different engine and question generation in mind
 	// given a job title and/or description.
-	InterviewQuestions(ctx context.Context, args InterviewArgs) (*InterviewResponse, error)
+	InterviewQuestions(
+		ctx context.Context,
+		input InterviewInput,
+		settings *InterviewRequestSettings,
+		options *InterviewOptions) (*InterviewResponse, error)
 
 	// Search performs a semantic search over a list of documents with the default engine.
 	Search(ctx context.Context, request SearchRequest) (*SearchResponse, error)
