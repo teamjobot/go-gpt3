@@ -65,7 +65,7 @@ func random(min, max int64) int64 {
 
 	n, err := rand.Int(rand.Reader, bg)
 	if err != nil {
-		panic(err)
+		return min
 	}
 
 	return n.Int64() + min

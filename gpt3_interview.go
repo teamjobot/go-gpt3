@@ -124,6 +124,7 @@ func formatInterviewInput(input string) string {
 func getInterviewPrompt(jobTitle, jobDesc string) string {
 	var prompt string
 
+	// TODO: if cap provided, consider "Create a list of %d questions" with cap
 	if len(jobTitle) > 0 && len(jobDesc) > 0 {
 		prompt = fmt.Sprintf(
 			"Create a list of questions for my interview with a %s, %s",
