@@ -89,6 +89,7 @@ type InterviewRequestSettings struct {
 type InterviewResponse struct {
 	Request   InterviewRequest
 	Duration  time.Duration
+	Options   *InterviewOptions
 	Questions []InterviewQuestion
 }
 
@@ -239,6 +240,7 @@ func (c *client) InterviewQuestions(
 
 	// Trying not to expose GPT-3 types to insulate caller but we are repeating some things w/that
 	result := &InterviewResponse{
+		Options: options,
 		Request: InterviewRequest{
 			Prompt:   prompt,
 			Settings: *settings,
