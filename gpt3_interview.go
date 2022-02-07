@@ -49,10 +49,10 @@ type InterviewInput struct {
 
 type InterviewOptions struct {
 	// Cap for max number of questions to take
-	Cap *int
+	Cap *int `json:"cap"`
 
 	// If true, received answers are randomly shuffled instead of taken in returned order
-	Shuffle bool
+	Shuffle bool `json:"shuffle"`
 }
 
 func (o InterviewOptions) GetCap() int {
@@ -70,32 +70,32 @@ func (o InterviewOptions) GetCap() int {
 }
 
 type InterviewRequest struct {
-	Prompt   string
-	Settings InterviewRequestSettings
+	Prompt   string                   `json:"prompt"`
+	Settings InterviewRequestSettings `json:"settings"`
 }
 
 // InterviewRequestSettings allows granular overrides of most AI settings.
 // Originally wasn't exposing any GPT settings to encapsulate and simplify caller use; later did for more control
 // but still not exposing some things that could conflict or confuse.
 type InterviewRequestSettings struct {
-	Engine           string
-	FrequencyPenalty float32
-	MaxTokens        *int
-	PresencePenalty  float32
-	Temperature      *float32
-	TopP             *float32
+	Engine           string   `json:"engine"`
+	FrequencyPenalty float32  `json:"frequencyPenalty"`
+	MaxTokens        *int     `json:"maxTokens"`
+	PresencePenalty  float32  `json:"presencePenalty"`
+	Temperature      *float32 `json:"temperature"`
+	TopP             *float32 `json:"topP"`
 }
 
 type InterviewResponse struct {
-	Request   InterviewRequest
-	Duration  time.Duration
-	Options   *InterviewOptions
-	Questions []InterviewQuestion
+	Request   InterviewRequest    `json:"request"`
+	Duration  time.Duration       `json:"duration"`
+	Options   *InterviewOptions   `json:"options"`
+	Questions []InterviewQuestion `json:"questions"`
 }
 
 type InterviewQuestion struct {
-	Index    int
-	Question string
+	Index    int    `json:"index"`
+	Question string `json:"question"`
 }
 
 func (r *InterviewResponse) HasQuestions() bool {
@@ -257,6 +257,9 @@ func (c *client) InterviewQuestions(
 				if len(result.Questions) == quesCap {
 					break
 				}
+
+				// Index is mostly for shuffle case to reset
+				qu.Index = len(result.Questions) + 1
 				result.Questions = append(result.Questions, qu)
 			}
 		}
