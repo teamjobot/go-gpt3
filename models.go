@@ -59,6 +59,10 @@ type CompletionRequest struct {
 	// Whether to stream back results or not. Don't set this value in the request yourself
 	// as it will be overriden depending on if you use CompletionStream or Completion methods.
 	Stream bool `json:"stream,omitempty"`
+
+	// Pass a uniqueID for every user w/ each API call (both for Completion & the Content Filter) e.g. user= $uniqueID.
+	// This 'user' param can be passed in the request body along with other params such as prompt, max_tokens etc.
+	User string `json:"user"`
 }
 
 // CompletionResponseChoice is one of the choices returned in the response to the Completions API

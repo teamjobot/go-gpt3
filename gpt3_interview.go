@@ -56,17 +56,17 @@ type InterviewOptions struct {
 }
 
 func (o InterviewOptions) GetCap() int {
-	cap := InterviewDefaultCap
+	capped := InterviewDefaultCap
 
 	if o.Cap != nil {
-		cap = *o.Cap
+		capped = *o.Cap
 	}
 
-	if cap > InterviewMaxCap {
-		cap = InterviewMaxCap
+	if capped > InterviewMaxCap {
+		capped = InterviewMaxCap
 	}
 
-	return cap
+	return capped
 }
 
 type InterviewRequest struct {
@@ -84,6 +84,7 @@ type InterviewRequestSettings struct {
 	PresencePenalty  float32  `json:"presencePenalty"`
 	Temperature      *float32 `json:"temperature"`
 	TopP             *float32 `json:"topP"`
+	User             string   `json:"user"`
 }
 
 type InterviewResponse struct {
@@ -149,7 +150,7 @@ func NewInterviewOptions(cap int) *InterviewOptions {
 }
 
 // NewInterviewSettings creates interview questions request with default optimized settings.
-func NewInterviewSettings() *InterviewRequestSettings {
+func NewInterviewSettings(user string) *InterviewRequestSettings {
 	// See Completion Request Settings comments at top of file
 	request := &InterviewRequestSettings{
 		Engine:           InterviewDefaultEngine,
@@ -158,12 +159,13 @@ func NewInterviewSettings() *InterviewRequestSettings {
 		PresencePenalty:  .7,
 		Temperature:      Float32Ptr(1),
 		TopP:             Float32Ptr(0.85),
+		User:             user,
 	}
 	return request
 }
 
 // NewInterviewSettingsRand creates interview questions request with more randomized settings to encourage new results.
-func NewInterviewSettingsRand() *InterviewRequestSettings {
+func NewInterviewSettingsRand(user string) *InterviewRequestSettings {
 	// See Completion Request Settings comments at top of file
 	// Use TopP most of the time but temp sometimes
 	temp := Float32Ptr(1)
@@ -182,6 +184,7 @@ func NewInterviewSettingsRand() *InterviewRequestSettings {
 		PresencePenalty:  float32Rand(0.1, 0.8),
 		Temperature:      temp,
 		TopP:             topP,
+		User:             user,
 	}
 
 	return request
@@ -200,6 +203,7 @@ func mapInterviewSettings(settings *InterviewRequestSettings, prompt string) Com
 		Stream:           false,
 		Temperature:      settings.Temperature,
 		TopP:             settings.TopP,
+		User:             settings.User,
 	}
 }
 
@@ -218,7 +222,7 @@ func (c *client) InterviewQuestions(
 	}
 
 	if settings == nil {
-		settings = NewInterviewSettings()
+		return nil, errors.New("request settings are required")
 	}
 	if len(settings.Engine) == 0 {
 		settings.Engine = InterviewDefaultEngine
