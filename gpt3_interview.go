@@ -277,28 +277,26 @@ func (c *client) InterviewQuestions(
 func stripLeadingNumbers(question string) string {
 	// Often question results are numbered 1), 2), etc. or 1. 2. 3. which we want to strip. Below considers input like:
 	// "3. What NAS Solutions (enterprise and scale-out) are you familiar with?"
-	return stripLeadingNumber(stripLeadingNumber(question, "."), ")")
+	result := stripLeadingNumber(question, ".")
+	result = stripLeadingNumber(result, ")")
+	return result
 }
 
 func stripLeadingNumber(question, punc string) string {
 	ques := question
-	pos := strings.Index(ques, fmt.Sprintf("%s ", punc))
+	pos := strings.Index(ques, fmt.Sprintf("%s", punc))
 
-	if pos == -1 {
-		pos = strings.Index(ques, ". ")
-	}
-
-	// i.e. "1) " through "99) "
+	// i.e. "1) " through "99) " or "1. ", "3."
 	if pos > -1 && pos <= 2 {
 		tmp := ques[0:pos]
 		_, err := strconv.Atoi(tmp)
 
 		if err == nil {
-			ques = ques[pos+2:]
+			ques = ques[pos+1:]
 		}
 	}
 
-	return ques
+	return strings.TrimSpace(ques)
 }
 
 func parseText(question string) string {
