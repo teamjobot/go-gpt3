@@ -1,4 +1,4 @@
-module github.com/PullRequestInc/go-gpt3
+module github.com/teamjobot/go-gpt3
 
 go 1.13
 
