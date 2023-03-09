@@ -196,7 +196,7 @@ func mapInterviewSettings(settings *InterviewRequestSettings, prompt string) Com
 		FrequencyPenalty: settings.FrequencyPenalty,
 		LogProbs:         nil,
 		MaxTokens:        settings.MaxTokens,
-		N:                Float32Ptr(1),
+		N:                IntPtr(1),
 		PresencePenalty:  settings.PresencePenalty,
 		Prompt:           []string{prompt},
 		Stop:             nil,
